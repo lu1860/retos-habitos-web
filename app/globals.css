@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/*
+ * Paleta y tipografía del proyecto. Cada token se usa en Tailwind con su nombre:
+ * bg-mist, text-ink, bg-water, text-sun, border-line, text-coral...
+ */
+@theme {
+  --color-ink: #12324a; /* texto principal y panel de marca */
+  --color-ink-soft: #2a4c66;
+  --color-water: #2f7fb8; /* acciones principales */
+  --color-water-dark: #23679a;
+  --color-mist: #eef4f7; /* fondo de la página */
+  --color-surface: #ffffff;
+  --color-line: #d5e2ea; /* bordes */
+  --color-muted: #5a6e7c; /* texto secundario */
+  --color-sun: #f4b63f; /* el "hecho hoy" */
+  --color-leaf: #2e7d55; /* éxito */
+  --color-coral: #b93d32; /* errores */
+
+  --font-display: "Bricolage Grotesque Variable", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* Foco visible con teclado en todos los elementos interactivos */
+:focus-visible {
+  outline: 3px solid var(--color-water);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
