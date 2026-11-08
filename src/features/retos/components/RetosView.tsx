@@ -1,6 +1,6 @@
 "use client";
 import { RetoImage } from "./RetoImage";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "../../auth/hooks/useSession";
 import { ApiError } from "../../common/services/api-error";
@@ -8,12 +8,12 @@ import { Alert } from "../../common/components/Alert";
 import { Button } from "../../common/components/Button";
 import { Loading } from "../../common/components/Loading";
 import { Pagination } from "../../common/components/Pagination";
-import { type Reto, type Membership, type RetoInput } from "../domain/reto";
+import { type Reto, type RetoInput } from "../domain/reto";
 import { useRetos } from "../hooks/useRetos";
 import { retosService } from "../services/retos.service";
 import { RetoCard } from "./RetoCard";
 import { RetoForm } from "./RetoForm";
-import { ParticipationControls } from "./ParticipationControls";
+import { RetoParticipation } from "./RetoParticipation";
 function ForbiddenNotice() {
   return useSearchParams().get("sinPermiso") === "1" ? (
     <Alert type="info" message="Esa sección es solo para administración." />
@@ -32,7 +32,6 @@ export function RetosView() {
   const [reto, setReto] = useState<Reto | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [membership, setMembership] = useState<{ userId: number; states: Record<number, Membership> }>({ userId: 0, states: {} });
   const detailVersion = useRef(0);
   const loadDetail = async (id: number) => {
     const request = ++detailVersion.current;
@@ -42,6 +41,13 @@ export function RetosView() {
     finally { if (request === detailVersion.current) setDetailLoading(false); }
   };
   const [busy, setBusy] = useState(false);
+  const [participationPending, setParticipationPending] = useState(false);
+  const participationLock = useRef(false);
+  const onParticipationPending = useCallback((pending: boolean) => {
+    participationLock.current = pending;
+    setParticipationPending(pending);
+  }, []);
+  const operationPending = busy || participationPending;
   const [issue, setIssue] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const lock = useRef(false);
@@ -52,9 +58,9 @@ export function RetosView() {
   }, [view, reto?.id]);
   if (!user) return null;
   const canEdit = Boolean(reto && (isAdmin || reto.creadorId === user.id));
-  const state = membership.userId === user.id && reto ? membership.states[reto.id] ?? "unknown" : "unknown";
   const categoryName = (id: number) => categories.find((item) => item.id === id)?.nombre ?? "Categoría no disponible";
   const navigate = (next: View) => {
+    if (participationLock.current) return;
     setIssue(null);
     setView(next);
   };
@@ -63,7 +69,7 @@ export function RetosView() {
     message: string,
     next?: View,
   ) => {
-    if (lock.current) return;
+    if (lock.current || participationLock.current) return;
     lock.current = true;
     setBusy(true);
     setIssue(null);
@@ -226,7 +232,7 @@ export function RetosView() {
             variant="ghost"
             className="self-start"
             onClick={() => navigate("list")}
-            disabled={busy}
+            disabled={operationPending}
           >
             ← Volver a los retos
           </Button>
@@ -248,27 +254,21 @@ export function RetosView() {
           )}
           <p className="whitespace-pre-wrap break-words">{reto.descripcion}</p>
           {reto.esOficial && <p>Reto oficial</p>}
-          <ParticipationControls state={state} busy={busy} onJoin={() => void run(async () => {
-              await retosService.join(reto.id);
-              setMembership((current) => ({ userId: user.id, states: { ...(current.userId === user.id ? current.states : {}), [reto.id]: "joined" } }));
-            }, "Participación confirmada.")} onLeave={() => void run(async () => {
-              await retosService.leave(reto.id);
-              setMembership((current) => ({ userId: user.id, states: { ...(current.userId === user.id ? current.states : {}), [reto.id]: "left" } }));
-            }, "Abandono confirmado.")} />
+          <RetoParticipation key={`${user.id}:${reto.id}`} retoId={reto.id} disabled={busy} onPendingChange={onParticipationPending} />
           <div className="flex flex-wrap gap-3">
             {canEdit && (
               <>
                 <Button
                   variant="secondary"
-                  disabled={busy}
+                  disabled={operationPending}
                   onClick={() => navigate("edit")}
                 >
                   Editar reto
                 </Button>
                 <Button
                   variant="danger"
-                  disabled={busy}
-                  onClick={() => dialog.current?.showModal()}
+                  disabled={operationPending}
+                  onClick={() => { if (!participationLock.current) dialog.current?.showModal(); }}
                 >
                   Eliminar reto
                 </Button>
@@ -310,10 +310,10 @@ export function RetosView() {
           </Button>
           <Button
             variant="danger"
-            disabled={busy}
+            disabled={operationPending}
             onClick={() => {
               dialog.current?.close();
-              if (!busy && reto && canEdit)
+              if (!operationPending && !participationLock.current && reto && canEdit)
                 void run(
                   () => retosService.remove(reto.id),
                   "Reto eliminado.",

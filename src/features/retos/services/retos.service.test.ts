@@ -6,6 +6,27 @@ import { sessionStore } from "../../auth/services/session.store.ts";
 const reto = { id: 90, nombre: "TEST-B-FRONT-contrato", descripcion: "Temporal", categoriaId: 2, duracionDias: 7, imagenUrl: null, esOficial: false, creadorId: 5, status: "ACTIVE", createdAt: "2026-11-08T00:00:00Z", updatedAt: "2026-11-08T00:00:00Z" };
 const input = { nombre: reto.nombre, descripcion: reto.descripcion, categoriaId: 2, duracionDias: 7 };
 afterEach(() => mock.restoreAll());
+test("participación consulta GET con JWT sin cuerpo ni usuario y exige booleano", async () => {
+ mock.method(sessionStore, "getToken", () => "jwt-prueba");
+ const fetch = http({ data: { participa: true } });
+ assert.equal(await retosService.participation(90), true);
+ const [url, options] = fetch.mock.calls[0].arguments as unknown as [string, RequestInit];
+ assert.ok(url.endsWith("/api/retos/90/participacion"));
+ assert.equal(options.method, "GET"); assert.equal(options.body, undefined);
+ assert.equal((options.headers as Record<string, string>).Authorization, "Bearer jwt-prueba");
+ for (const participa of [false, "false", 0, null, undefined]) {
+  fetch.mock.mockImplementation(async () => response({ data: { participa } }));
+  if (participa === false) assert.equal(await retosService.participation(90), false);
+  else await assert.rejects(retosService.participation(90), /inválida/);
+ }
+ for (const status of [401, 403, 404, 500]) {
+  mock.method(sessionStore, "clear", () => {});
+  fetch.mock.mockImplementation(async () => response({ error: "Rechazo" }, status));
+  await assert.rejects(retosService.participation(90), (e: unknown) => e instanceof ApiError && e.status === status);
+ }
+ fetch.mock.mockImplementation(async () => { throw new Error("offline"); });
+ await assert.rejects(retosService.participation(90), (e: unknown) => e instanceof ApiError && e.status === 0);
+});
 function response(body: unknown, status = 200) { return new Response(status === 204 ? null : JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }); }
 function http(body: unknown, status = 200) { return mock.method(globalThis, "fetch", async () => response(body, status)); }
 test("listado conserva contrato, filtros codificados y paginación remota", async () => {
@@ -95,6 +116,19 @@ test("401 con JWT cierra sesión usando el mecanismo existente", async () => {
  mock.method(sessionStore, "getToken", () => "vencido"); const clear = mock.method(sessionStore, "clear", () => {});
  http({ error: "Token inválido" }, 401); await assert.rejects(retosService.join(90));
  assert.deepEqual(clear.mock.calls[0].arguments, [true]);
+});
+
+test("401 tardío de participación no cierra una sesión nueva", async () => {
+ let token = "sesion-anterior";
+ mock.method(sessionStore, "getToken", () => token);
+ const clear = mock.method(sessionStore, "clear", () => {});
+ let finish!: (value: Response) => void;
+ mock.method(globalThis, "fetch", () => new Promise<Response>(resolve => { finish = resolve; }));
+ const request = retosService.participation(90);
+ token = "sesion-nueva";
+ finish(response({ error: "Token vencido" }, 401));
+ await assert.rejects(request);
+ assert.equal(clear.mock.callCount(), 0);
 });
 test("error de red permite reintentar sin datos ficticios", async () => {
  const fetch = mock.method(globalThis, "fetch", async () => { throw new Error("offline"); });

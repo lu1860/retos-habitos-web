@@ -60,7 +60,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (!response.ok) {
     // 401 con sesión abierta: el token venció o ya no sirve. Al cerrar la sesión,
     // PrivateRoute lleva al login con el aviso de sesión terminada.
-    if (response.status === 401 && token) sessionStore.clear(true);
+    if (response.status === 401 && token && sessionStore.getToken() === token) sessionStore.clear(true);
     throw await toApiError(response, errorMessage);
   }
 

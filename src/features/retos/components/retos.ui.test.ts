@@ -40,25 +40,119 @@ const { retosService } = await import("../services/retos.service.ts");
 const { RetosView } = await import("./RetosView.tsx");
 const { RetoImage } = await import("./RetoImage.tsx");
 const { SessionContext } = await import("../../auth/hooks/useSession.ts");
-const { ApiError } = await import("../../common/services/api-error.ts");
 const noop = () => {};
-test("participación inicialmente desconocida permite ambas acciones sin afirmar pertenencia", () => {
+const { RetoParticipation } = await import("./RetoParticipation.tsx");
+
+test("mutaciones conservan estado ante error, bloquean duplicados y descartan éxitos tardíos", async () => {
+ await withDOM(async container => {
+  const root = createRoot(container);
+  mock.method(retosService, "participation", async () => false);
+  const joined = { id: 1, usuarioId: 5, retoId: 90, fechaUnion: reto.createdAt, status: "ACTIVE" as const };
+  const join = mock.method(retosService, "join", async () => { throw new Error("Unión rechazada"); return joined; });
+  const leave = mock.method(retosService, "leave", async () => { throw new Error("Abandono rechazado"); });
+  const render = (id: number) => act(async () => {
+   root.render(createElement(SessionContext.Provider, { value: { ...session, user: { ...session.user, id } } }, createElement(RetoParticipation, { retoId: 90 })));
+  });
+  try {
+   await render(5);
+   await click(container, "Confirmar unión");
+   assert.match(container.textContent!, /Unión rechazada/);
+   assert.ok(buttonByText(container, "Confirmar unión"));
+   let finish!: () => void;
+   join.mock.mockImplementation(() => new Promise<typeof joined>(resolve => { finish = () => resolve(joined); }));
+   await click(container, "Confirmar unión");
+   assert.equal(container.querySelector<HTMLButtonElement>('button[aria-busy="true"]')!.disabled, true);
+   await act(async () => { container.querySelector<HTMLButtonElement>("button")!.click(); });
+   assert.equal(join.mock.callCount(), 2);
+   await act(async () => { finish(); });
+   await click(container, "Abandonar reto");
+   assert.match(container.textContent!, /Abandono rechazado/);
+   assert.ok(buttonByText(container, "Abandonar reto"));
+   leave.mock.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+   await click(container, "Abandonar reto");
+   await render(6);
+   await act(async () => { finish(); });
+   assert.ok(buttonByText(container, "Confirmar unión"));
+   await click(container, "Confirmar unión");
+   await render(7);
+   await act(async () => { finish(); });
+   assert.ok(buttonByText(container, "Confirmar unión"));
+  } finally { await act(async () => { root.unmount(); }); }
+ });
+});
+
+test("participación: carga, error, reintento, acciones, reapertura y sesiones con respuestas tardías", async () => {
+ await withDOM(async container => {
+  const root = createRoot(container);
+  let resolve!: (value: boolean) => void;
+  const participation = mock.method(retosService, "participation", () => new Promise<boolean>(done => { resolve = done; }));
+  const join = mock.method(retosService, "join", async () => ({ id: 1, usuarioId: 5, retoId: 90, fechaUnion: reto.createdAt, status: "ACTIVE" as const }));
+  const leave = mock.method(retosService, "leave", async () => {});
+  const render = (value: typeof session | { status: "anonymous"; user: null; isAdmin: boolean; login: typeof session.login; register: typeof session.register; logout: typeof noop } = session, id = 90) => act(async () => {
+   root.render(createElement(SessionContext.Provider, { value }, createElement(RetoParticipation, { retoId: id })));
+  });
+  try {
+   await render();
+   assert.match(container.textContent!, /Cargando participación/);
+   assert.equal(container.querySelector("button"), null);
+   await act(async () => { resolve(true); });
+   assert.ok(buttonByText(container, "Abandonar reto"));
+   await click(container, "Abandonar reto");
+   assert.equal(leave.mock.callCount(), 1);
+   assert.ok(buttonByText(container, "Confirmar unión"));
+   await click(container, "Confirmar unión");
+   assert.equal(join.mock.callCount(), 1);
+   assert.match(container.textContent!, /Participación confirmada/);
+   participation.mock.mockImplementation(async () => { throw new Error("Sin conexión"); });
+   await render(session, 91);
+   assert.match(container.textContent!, /No se pudo consultar.*Sin conexión/);
+   assert.equal(buttonByText(container, "Confirmar unión"), undefined);
+   participation.mock.mockImplementation(async () => false);
+   await click(container, "Reintentar participación");
+   assert.ok(buttonByText(container, "Confirmar unión"));
+   await render(session, 90);
+   assert.ok(buttonByText(container, "Confirmar unión"));
+   participation.mock.mockImplementation(() => new Promise<boolean>(done => { resolve = done; }));
+   await render(session, 92);
+   const oldResponse = resolve;
+   await render({ ...session, user: { ...session.user, id: 6 } }, 92);
+   await act(async () => { resolve(false); oldResponse(true); });
+   assert.ok(buttonByText(container, "Confirmar unión"));
+   await render(session, 93);
+   const previousReto = resolve;
+   await render(session, 94);
+   await act(async () => { resolve(false); previousReto(true); });
+   assert.ok(buttonByText(container, "Confirmar unión"));
+   await render(session, 95);
+   const beforeLogout = resolve;
+   await render({ ...session, status: "anonymous", user: null });
+   await act(async () => { beforeLogout(true); });
+   assert.match(container.textContent!, /Inicia sesión/);
+   assert.equal(container.querySelector("button"), null);
+   await render();
+   assert.match(container.textContent!, /Cargando participación/);
+   await act(async () => { resolve(true); });
+   assert.ok(participation.mock.callCount() >= 9);
+  } finally { await act(async () => { root.unmount(); }); }
+ });
+});
+test("participación inicialmente desconocida bloquea ambas acciones", () => {
   const html = renderToStaticMarkup(createElement(ParticipationControls, { state: "unknown", busy: false, onJoin: noop, onLeave: noop }));
   assert.match(html, /Participación desconocida/);
-  assert.match(html, /Confirmar unión/); assert.match(html, /Abandonar reto/);
+  assert.doesNotMatch(html, /Confirmar unión|Abandonar reto/);
   assert.doesNotMatch(html, /Ya participas|Participación confirmada|participantes/);
 });
 test("participación confirmada y abandono confirmado ofrecen la acción correspondiente", () => {
   for (const state of ["joined", "left"] as const) {
     const html = renderToStaticMarkup(createElement(ParticipationControls, { state, busy: false, onJoin: noop, onLeave: noop }));
-    assert.match(html, state === "joined" ? /Participación confirmada/ : /Abandono confirmado/);
+    assert.match(html, state === "joined" ? /Participación confirmada/ : /No participas en este reto/);
     assert.equal(html.includes("Confirmar unión"), state === "left");
     assert.equal(html.includes("Abandonar reto"), state === "joined");
   }
 });
-test("ambas acciones de participación quedan bloqueadas durante la solicitud", () => {
-  const html = renderToStaticMarkup(createElement(ParticipationControls, { state: "unknown", busy: true, onJoin: noop, onLeave: noop }));
-  assert.equal((html.match(/disabled=""/g) ?? []).length, 2);
+test("la acción de participación queda bloqueada durante la solicitud", () => {
+  const html = renderToStaticMarkup(createElement(ParticipationControls, { state: "joined", busy: true, onJoin: noop, onLeave: noop }));
+  assert.equal((html.match(/disabled=""/g) ?? []).length, 1);
 });
 const reto = { id: 90, nombre: "Leer", descripcion: "Un capítulo", categoriaId: 3, duracionDias: 7, imagenUrl: null, esOficial: true, creadorId: 5, status: "ACTIVE" as const, createdAt: "2026-11-08T00:00:00Z", updatedAt: "2026-11-08T00:00:00Z" };
 test("tarjeta presenta categoría real y oficialidad, sin creador ni contador inventado", () => {
@@ -200,9 +294,114 @@ test("formulario rechaza guardar un ID de categoría desconocido aunque se fuerc
 
 const session = { status: "authenticated" as const, user: { id: 5, nombre: "Prueba local", email: "fixture@example.invalid", rol: "user" as const, status: "ACTIVE" as const, createdAt: reto.createdAt }, isAdmin: false, login: async () => {}, register: async () => {}, logout: noop };
 const view = () => createElement(SessionContext.Provider, { value: session }, createElement(RetosView));
+
+test("detalle consulta al abrir y tras remontar; listado no consulta participación", async () => {
+ await withDOM(async container => {
+  let root = createRoot(container);
+  mock.method(retosService, "categories", async () => [{ id: 3, nombre: "Lectura" }]);
+  mock.method(retosService, "list", async () => ({ data: [reto], pagination: { total: 1, currentPage: 1, totalPages: 1, limit: 6 } }));
+  mock.method(retosService, "detail", async () => reto);
+  const participation = mock.method(retosService, "participation", async () => true);
+  try {
+   await act(async () => { root.render(view()); }); await settleList();
+   assert.equal(participation.mock.callCount(), 0);
+   await click(container, "Ver detalle");
+   assert.ok(buttonByText(container, "Abandonar reto"));
+   await click(container, "← Volver a los retos");
+   await click(container, "Ver detalle");
+   assert.equal(participation.mock.callCount(), 2);
+   await act(async () => { root.unmount(); }); root = createRoot(container);
+   await act(async () => { root.render(view()); }); await settleList();
+   await click(container, "Ver detalle");
+   assert.equal(participation.mock.callCount(), 3);
+   assert.ok(buttonByText(container, "Abandonar reto"));
+  } finally { await act(async () => { root.unmount(); }); }
+ });
+});
 const buttonByText = (container: HTMLElement, text: string) => [...container.querySelectorAll("button")].find(b => b.textContent?.trim() === text)!;
 const click = (container: HTMLElement, text: string) => act(async () => { buttonByText(container, text).click(); });
 const settleList = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 280)); });
+
+for (const joined of [false, true]) {
+ for (const fails of [false, true]) {
+  test(`${joined ? "abandono" : "unión"} pendiente bloquea detalle y duplicados; ${fails ? "error" : "éxito"} libera controles`, async () => {
+   await withDOM(async container => {
+    const root = createRoot(container);
+    mock.method(retosService, "categories", async () => [{ id: 3, nombre: "Lectura" }]);
+    mock.method(retosService, "list", async () => ({ data: [reto], pagination: { total: 1, currentPage: 1, totalPages: 1, limit: 6 } }));
+    mock.method(retosService, "detail", async () => reto);
+    const participation = mock.method(retosService, "participation", async () => joined);
+    let finish!: () => void;
+    const pending = new Promise<never>((resolve, reject) => {
+     finish = () => fails ? reject(new Error("Operación rechazada")) : resolve(undefined as never);
+    });
+    const mutation = mock.method(retosService, joined ? "leave" : "join", () => pending);
+    const remove = mock.method(retosService, "remove", async () => {});
+    try {
+     await act(async () => { root.render(view()); }); await settleList();
+     await click(container, "Ver detalle");
+     const action = buttonByText(container, joined ? "Abandonar reto" : "Confirmar unión");
+     await act(async () => { action.click(); action.click(); });
+     assert.equal(mutation.mock.callCount(), 1);
+     assert.equal(action.disabled, true);
+     assert.match(container.textContent!, /Actualizando participación/);
+     for (const label of ["Editar reto", "Eliminar reto", "← Volver a los retos", "Confirmar eliminación"]) {
+      assert.equal(buttonByText(container, label).disabled, true, label);
+      await click(container, label);
+     }
+     assert.equal(remove.mock.callCount(), 0);
+     assert.equal(participation.mock.callCount(), 1);
+     assert.equal(container.querySelector("dialog")!.open, false);
+     await act(async () => { finish(); });
+     for (const label of ["Editar reto", "Eliminar reto", "← Volver a los retos", "Confirmar eliminación"]) {
+      assert.equal(buttonByText(container, label).disabled, false, label);
+     }
+     assert.doesNotMatch(container.textContent!, /Actualizando participación/);
+     if (fails) assert.match(container.textContent!, /Operación rechazada/);
+     assert.ok(buttonByText(container, (fails ? joined : !joined) ? "Abandonar reto" : "Confirmar unión"));
+     await click(container, "← Volver a los retos");
+     await click(container, "Ver detalle");
+     assert.equal(participation.mock.callCount(), 2);
+     assert.ok(buttonByText(container, joined ? "Abandonar reto" : "Confirmar unión"));
+    } finally { await act(async () => { root.unmount(); }); }
+   });
+  });
+ }
+}
+
+test("operación tardía libera al cambiar reto o sesión sin desbloquear una operación nueva", async () => {
+ await withDOM(async container => {
+  const root = createRoot(container);
+  mock.method(retosService, "participation", async () => false);
+  const finishes: (() => void)[] = [];
+  mock.method(retosService, "join", () => new Promise(resolve => {
+   finishes.push(() => resolve({ id: 1, usuarioId: 5, retoId: 90, fechaUnion: reto.createdAt, status: "ACTIVE" }));
+  }));
+  let pending = false;
+  const onPendingChange = (value: boolean) => { pending = value; };
+  const render = (id: number, userId = 5) => act(async () => {
+   root.render(createElement(SessionContext.Provider, { value: { ...session, user: { ...session.user, id: userId } } },
+    createElement(RetoParticipation, { retoId: id, onPendingChange })));
+  });
+  try {
+   await render(90);
+   await click(container, "Confirmar unión"); assert.equal(pending, true);
+   await render(91); assert.equal(pending, false);
+   await click(container, "Confirmar unión");
+   await act(async () => { finishes[0](); });
+   assert.equal(pending, true);
+   assert.doesNotMatch(container.textContent!, /Participación confirmada/);
+   await render(91, 6); assert.equal(pending, false);
+   await click(container, "Confirmar unión");
+   await act(async () => { finishes[1](); });
+   assert.equal(pending, true);
+   assert.doesNotMatch(container.textContent!, /Participación confirmada/);
+   await act(async () => { finishes[2](); });
+   assert.equal(pending, false);
+   assert.match(container.textContent!, /Participación confirmada/);
+  } finally { await act(async () => { root.unmount(); }); }
+ });
+});
 
 test("contador del listado presenta cero, singular y plural", async () => {
   await withDOM(async container => {
@@ -331,43 +530,6 @@ test("paginación recorre primera siguiente anterior última y reinicia con filt
       assert.equal(list.mock.calls.at(-1)!.arguments[0]!.page, 1);
       assert.match(container.textContent!, /No hay retos que coincidan/);
       assert.equal(container.querySelector('nav[aria-label="Paginación"]'), null);
-    } finally { await act(async () => { root.unmount(); }); }
-  });
-});
-
-test("participación real del componente usa mocks: éxito, duplicada, autorización, red, carga y recarga desconocida", async () => {
-  await withDOM(async container => {
-    let root = createRoot(container);
-    mock.method(retosService, "categories", async () => [{ id: 3, nombre: "Lectura" }]);
-    mock.method(retosService, "list", async () => ({ data: [reto], pagination: { total: 1, currentPage: 1, totalPages: 1, limit: 6 } }));
-    mock.method(retosService, "detail", async () => reto);
-    const join = mock.method(retosService, "join");
-    const leave = mock.method(retosService, "leave", async () => {});
-    const open = async () => { await act(async () => { root.render(view()); }); await settleList(); await click(container, "Ver detalle"); };
-    try {
-      await open();
-      for (const error of [new ApiError(409, "Participación duplicada"), new ApiError(403, "Sin autorización"), new ApiError(401, "Sesión vencida"), new Error("Sin conexión")]) {
-        join.mock.mockImplementation(async () => { throw error; });
-        await click(container, "Confirmar unión");
-        assert.match(container.textContent!, /Participación desconocida/);
-        assert.ok(container.textContent!.includes(error.message));
-      }
-      let finish!: () => void;
-      join.mock.mockImplementation(() => new Promise(resolve => { finish = () => resolve({ id: 1, usuarioId: 5, retoId: 90, fechaUnion: reto.createdAt, status: "ACTIVE" }); }));
-      await click(container, "Confirmar unión");
-      assert.equal(buttonByText(container, "Abandonar reto").disabled, true);
-      await act(async () => { finish(); });
-      assert.match(container.textContent!, /Participación confirmada/);
-      assert.equal(buttonByText(container, "Confirmar unión"), undefined);
-      leave.mock.mockImplementation(async () => { throw new Error("Sin conexión al abandonar"); });
-      await click(container, "Abandonar reto");
-      assert.match(container.textContent!, /Participación confirmada/);
-      assert.match(container.textContent!, /Sin conexión al abandonar/);
-      leave.mock.mockImplementation(async () => {});
-      await click(container, "Abandonar reto");
-      assert.match(container.textContent!, /Abandono confirmado/);
-      await act(async () => { root.unmount(); }); root = createRoot(container);
-      await open(); assert.match(container.textContent!, /Participación desconocida/);
     } finally { await act(async () => { root.unmount(); }); }
   });
 });

@@ -8,10 +8,10 @@ export function ParticipationControls({ state, busy, onJoin, onLeave }: {
   onLeave: () => void;
 }) {
   return <>
-    <p role="status">{state === "joined" ? "Participación confirmada." : state === "left" ? "Abandono confirmado." : "Participación desconocida. Puedes confirmar tu unión o solicitar abandonar el reto."}</p>
+    <p role="status">{state === "joined" ? "Participación confirmada." : state === "left" ? "No participas en este reto." : "Participación desconocida."}</p>
     <div className="flex flex-wrap gap-3">
-      {state !== "joined" && <Button isLoading={busy} disabled={busy} onClick={onJoin}>Confirmar unión</Button>}
-      {state !== "left" && <Button variant="secondary" disabled={busy} onClick={onLeave}>Abandonar reto</Button>}
+      {state === "left" && <Button isLoading={busy} disabled={busy} onClick={onJoin}>Confirmar unión</Button>}
+      {state === "joined" && <Button variant="secondary" disabled={busy} onClick={onLeave}>Abandonar reto</Button>}
     </div>
   </>;
 }
