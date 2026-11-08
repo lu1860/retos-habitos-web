@@ -1,5 +1,5 @@
 "use client";
-import Image from "next/image";
+import { RetoImage } from "./RetoImage";
 import { useRef, useState, type FormEvent } from "react";
 import { Alert } from "../../common/components/Alert";
 import { Button } from "../../common/components/Button";
@@ -164,10 +164,7 @@ export function RetoForm({
             {reading && <p role="status">Preparando vista previa…</p>}
             {preview && (
               <>
-                <Image
-                  unoptimized
-                  width={960}
-                  height={540}
+                <RetoImage
                   src={preview}
                   alt="Vista previa de la imagen seleccionada"
                   className="max-h-56 w-full rounded-lg object-contain"

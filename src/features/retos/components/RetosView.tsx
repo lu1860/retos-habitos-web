@@ -1,5 +1,5 @@
 "use client";
-import Image from "next/image";
+import { RetoImage } from "./RetoImage";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "../../auth/hooks/useSession";
@@ -170,7 +170,7 @@ export function RetosView() {
           ) : (
             <>
               <p role="status" className="text-sm text-muted">
-                {pagination.total} retos encontrados
+                {pagination.total} {pagination.total === 1 ? "reto encontrado" : "retos encontrados"}
               </p>
               {items.length ? (
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -240,10 +240,7 @@ export function RetosView() {
             {reto.nombre}
           </h1>
           {reto.imagenUrl && (
-            <Image
-              unoptimized
-              width={960}
-              height={540}
+            <RetoImage
               src={reto.imagenUrl}
               alt={`Imagen de ${reto.nombre}`}
               className="max-h-80 w-full rounded-xl object-contain"

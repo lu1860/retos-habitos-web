@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { RetoImage } from "./RetoImage";
 import type { Reto } from "../domain/reto";
 import { Button } from "../../common/components/Button";
 export function RetoCard({
@@ -13,10 +13,7 @@ export function RetoCard({
   return (
     <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface">
       {reto.imagenUrl ? (
-        <Image
-          unoptimized
-          width={960}
-          height={540}
+        <RetoImage
           src={reto.imagenUrl}
           alt={`Imagen de ${reto.nombre}`}
           className="h-44 w-full object-cover"
