@@ -1,6 +1,6 @@
-import { sessionStore } from "../../auth/services/session.store";
-import { API_BASE_URL } from "../config";
-import { ApiError, toApiError } from "./api-error";
+import { sessionStore } from "../../auth/services/session.store.ts";
+import { API_BASE_URL } from "../config.ts";
+import { ApiError, toApiError } from "./api-error.ts";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

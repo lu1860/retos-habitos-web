@@ -1,5 +1,35 @@
 {
+  "name": "retos-habitos-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/features/retos/domain/validation.test.ts src/features/retos/services/retos.service.test.ts src/features/retos/components/retos.ui.test.ts"
+  },
   "dependencies": {
-    "lucide-react": "^1.40.0"
-  }
+    "@fontsource-variable/bricolage-grotesque": "^5",
+    "@fontsource/atkinson-hyperlegible": "^5",
+    "lucide-react": "^1.40.0",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.5",
+    "jsdom": "^31.0.0",
+    "postcss": "^8",
+    "tailwindcss": "^4",
+    "typescript": "~5.9.3"
+  },
+  "type": "module"
 }
