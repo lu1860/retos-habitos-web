@@ -14,6 +14,7 @@ import { retosService } from "../services/retos.service";
 import { RetoCard } from "./RetoCard";
 import { RetoForm } from "./RetoForm";
 import { RetoParticipation } from "./RetoParticipation";
+import { RegistroDiario } from "./RegistroDiario";
 function ForbiddenNotice() {
   return useSearchParams().get("sinPermiso") === "1" ? (
     <Alert type="info" message="Esa sección es solo para administración." />
@@ -255,6 +256,7 @@ export function RetosView() {
           <p className="whitespace-pre-wrap break-words">{reto.descripcion}</p>
           {reto.esOficial && <p>Reto oficial</p>}
           <RetoParticipation key={`${user.id}:${reto.id}`} retoId={reto.id} disabled={busy} onPendingChange={onParticipationPending} />
+          <RegistroDiario retoId={reto.id} />
           <div className="flex flex-wrap gap-3">
             {canEdit && (
               <>
