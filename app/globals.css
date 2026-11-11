@@ -1,44 +1,80 @@
+
 @import "tailwindcss";
 
-/*
- * Paleta y tipografía del proyecto. Cada token se usa en Tailwind con su nombre:
- * bg-mist, text-ink, bg-water, text-sun, border-line, text-coral...
- */
-@theme {
-  --color-ink: #12324a; /* texto principal y panel de marca */
-  --color-ink-soft: #2a4c66;
-  --color-water: #2f7fb8; /* acciones principales */
-  --color-water-dark: #23679a;
-  --color-mist: #eef4f7; /* fondo de la página */
-  --color-surface: #ffffff;
-  --color-line: #d5e2ea; /* bordes */
-  --color-muted: #5a6e7c; /* texto secundario */
-  --color-sun: #f4b63f; /* el "hecho hoy" */
-  --color-leaf: #2e7d55; /* éxito */
-  --color-coral: #b93d32; /* errores */
+/* ========================================
+   RETOS DE HÁBITOS — IDENTIDAD VISUAL
+   Estilo natural, sofisticado y luminoso
+======================================== */
 
+@theme {
+  /* Colores principales */
+  --color-ink: #263D35;
+  --color-ink-soft: #405B4D;
+
+  /* Acciones */
+  --color-water: #78947D;
+  --color-water-dark: #607B65;
+
+  /* Fondos */
+  --color-mist: #F7F5EF;
+  --color-surface: #FFFFFF;
+  --color-line: #E5E6DC;
+
+  /* Textos */
+  --color-muted: #7B8178;
+
+  /* Estados */
+  --color-sun: #D9A66F;
+  --color-leaf: #66876D;
+  --color-coral: #B96859;
+
+  /* Tipografía */
   --font-display: "Bricolage Grotesque Variable", "Segoe UI", system-ui, sans-serif;
   --font-sans: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
 }
 
 html {
   color-scheme: light;
+  scroll-behavior: smooth;
 }
 
 body {
+  background-color: var(--color-mist);
+  color: var(--color-ink);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Foco visible con teclado en todos los elementos interactivos */
+/* Selección de texto */
+::selection {
+  background: #DCE7D9;
+  color: #263D35;
+}
+
+/* Foco accesible */
 :focus-visible {
   outline: 3px solid var(--color-water);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
+/* Transiciones suaves */
+button,
+a,
+input,
+textarea,
+select {
+  transition: background-color 180ms ease,
+              border-color 180ms ease,
+              color 180ms ease,
+              box-shadow 180ms ease;
+}
+
+/* Respeto por movimiento reducido */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
+    scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
