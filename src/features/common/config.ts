@@ -5,5 +5,5 @@
  * Si no está definida se usa la API local, para poder trabajar sin configurar nada.
  */
 export const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_HOST || "http://localhost:3001/api"
+  process.env.NEXT_PUBLIC_API_HOST || "http://localhost:3000/api"
 ).replace(/\/+$/, "");

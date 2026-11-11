@@ -1,6 +1,11 @@
 
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { WeekStrip } from "@/src/features/common/components/WeekStrip";
+import { retosService } from "@/src/features/retos/services/retos.service";
+import type { Reto } from "@/src/features/retos/domain/reto";
 
 const beneficios = [
   {
@@ -23,31 +28,18 @@ const beneficios = [
   },
 ];
 
-const retos = [
-  {
-    categoria: "BIENESTAR",
-    nombre: "8 vasos de agua al día",
-    duracion: "21 días",
-    descripcion: "Haz de la hidratación una parte natural de tu rutina.",
-    icono: "◉",
-  },
-  {
-    categoria: "MOVIMIENTO",
-    nombre: "Caminar 20 minutos",
-    duracion: "30 días",
-    descripcion: "Regálate un momento para moverte y conectar contigo.",
-    icono: "↗",
-  },
-  {
-    categoria: "CRECIMIENTO",
-    nombre: "Leer 15 minutos",
-    duracion: "14 días",
-    descripcion: "Dedica unos minutos diarios a alimentar tu mente.",
-    icono: "▤",
-  },
-];
-
 export default function HomePage() {
+  const [retos, setRetos] = useState<Reto[]>([]);
+  const [cargandoRetos, setCargandoRetos] = useState(true);
+  const [errorRetos, setErrorRetos] = useState(false);
+
+  useEffect(() => {
+    retosService
+      .list({ limit: 6 })
+      .then((respuesta) => setRetos(respuesta.data))
+      .catch(() => setErrorRetos(true))
+      .finally(() => setCargandoRetos(false));
+    }, []);
   return (
     <main className="flex-1 overflow-hidden bg-mist">
 
@@ -258,48 +250,70 @@ export default function HomePage() {
               Explorar retos →
             </Link>
           </div>
-
           <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {retos.map((reto) => (
-              <article
-                key={reto.nombre}
-                className="group overflow-hidden rounded-3xl border border-line bg-mist transition hover:-translate-y-1 hover:shadow-lg"
-              >
-                <div className="flex h-40 items-center justify-center bg-[#E9E8D9]">
-                  <span className="font-display text-7xl text-water-dark transition group-hover:scale-110">
-                    {reto.icono}
-                  </span>
-                </div>
+  {cargandoRetos && (
+    <p className="text-muted">Cargando retos disponibles...</p>
+  )}
 
-                <div className="p-7">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold tracking-wider text-water-dark">
-                      {reto.categoria}
-                    </span>
+  {errorRetos && (
+    <p className="text-muted">
+      No fue posible cargar los retos. Intenta nuevamente.
+    </p>
+  )}
 
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-muted">
-                      {reto.duracion}
-                    </span>
-                  </div>
+  {!cargandoRetos && !errorRetos && retos.length === 0 && (
+    <p className="text-muted">Todavía no hay retos disponibles.</p>
+  )}
 
-                  <h3 className="mt-5 font-display text-xl font-bold text-ink">
-                    {reto.nombre}
-                  </h3>
+  {retos.map((reto) => (
+    <article
+      key={reto.id}
+      className="group overflow-hidden rounded-3xl border border-line bg-mist transition hover:-translate-y-1 hover:shadow-lg"
+    >
+      <div className="flex h-40 items-center justify-center overflow-hidden bg-[#E9E8D9]">
+        {reto.imagenUrl ? (
+          <img
+            src={reto.imagenUrl}
+            alt={reto.nombre}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="font-display text-6xl text-water-dark">
+            ✳
+          </span>
+        )}
+      </div>
 
-                  <p className="mt-3 min-h-14 text-sm leading-6 text-muted">
-                    {reto.descripcion}
-                  </p>
+      <div className="p-7">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-bold tracking-wider text-water-dark">
+            {reto.esOficial ? "RETO OFICIAL" : "RETO"}
+          </span>
 
-                  <Link
-                    href="/register"
-                    className="mt-6 inline-flex font-bold text-water-dark transition hover:text-ink"
-                  >
-                    Quiero comenzar →
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-muted">
+            {reto.duracionDias} días
+          </span>
+        </div>
+
+        <h3 className="mt-5 font-display text-xl font-bold text-ink">
+          {reto.nombre}
+        </h3>
+
+        <p className="mt-3 min-h-14 text-sm leading-6 text-muted">
+          {reto.descripcion}
+        </p>
+
+        <Link
+          href="/register"
+          className="mt-6 inline-flex font-bold text-water-dark transition hover:text-ink"
+        >
+          Quiero participar →
+        </Link>
+      </div>
+    </article>
+  ))}
+</div>
+          
         </div>
       </section>
 
