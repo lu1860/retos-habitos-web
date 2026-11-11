@@ -1,4 +1,4 @@
-import type { Reto, RetoInput, Categoria, Participacion } from "../domain/reto.ts";
+import type { Reto, RetoInput, Categoria, Participacion,ParticipacionConReto, } from "../domain/reto.ts";
 import { validateReto, validateImage } from "../domain/validation.ts";
 import { apiRequest } from "../../common/services/http.ts";
 import type { DataResponse, PaginatedResponse } from "../../common/domain/pagination.ts";
@@ -8,6 +8,11 @@ export const retosService = {
   if (typeof result?.data?.participa !== "boolean") throw new Error("Respuesta de participación inválida.");
   return result.data.participa;
  },
+async misParticipaciones(): Promise<ParticipacionConReto[]> {
+  const result = await apiRequest<{ data: ParticipacionConReto[] }>(
+    "/retos/mis-participaciones",);
+  return result.data;
+},
  list({ q = "", categoriaId, page = 1, limit = 6 }: { q?: string; categoriaId?: number; page?: number; limit?: number } = {}) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 50 || !Number.isSafeInteger(page) || page < 1) throw new Error("Paginación inválida: máximo 50 elementos.");
   const query = new URLSearchParams({ page: String(page), limit: String(limit) });
