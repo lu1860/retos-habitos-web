@@ -7,3 +7,4 @@ export interface Categoria { id: number; nombre: string }
 export type RetoInput = Pick<Reto, "nombre" | "descripcion" | "duracionDias" | "categoriaId"> & { imagen?: File };
 export interface Participacion { id: number; usuarioId: number; retoId: number; fechaUnion: string; status: "ACTIVE" | "INACTIVE" }
 export type Membership = "unknown" | "joined" | "left";
+export interface ParticipacionConReto {participacion: Participacion;reto: Reto;}
