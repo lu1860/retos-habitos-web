@@ -11,7 +11,9 @@ export interface NavItem {
  * Menú de la parte privada. Para una página nueva: crearla en app/(private)/<ruta>/page.tsx
  * y agregar aquí su enlace (por ejemplo, { href: "/progreso", label: "Mi progreso", roles: ["admin", "user"] }).
  */
+
 export const PRIVATE_NAV: NavItem[] = [
+  { href: "/inicio", label: "Inicio", roles: ["user"] },
   { href: "/retos", label: "Retos", roles: ["admin", "user"] },
   { href: "/admin", label: "Administración", roles: ["admin"] },
 ];
