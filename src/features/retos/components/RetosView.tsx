@@ -20,6 +20,25 @@ function ForbiddenNotice() {
     <Alert type="info" message="Esa sección es solo para administración." />
   ) : null;
 }
+
+function RetoQueryHandler({
+  onOpen,}: {
+  onOpen: (id: number) => void;}) {
+  const searchParams = useSearchParams();
+  const retoId = searchParams.get("reto");
+
+  useEffect(() => {
+    if (!retoId) return;
+
+    const id = Number(retoId);
+
+    if (Number.isSafeInteger(id) && id > 0) {
+      onOpen(id);
+    }
+  }, [retoId, onOpen]);
+
+  return null;}
+
 type View = "list" | "detail" | "create" | "edit";
 export function RetosView() {
   const { user, isAdmin } = useSession();
@@ -34,13 +53,28 @@ export function RetosView() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const detailVersion = useRef(0);
-  const loadDetail = async (id: number) => {
-    const request = ++detailVersion.current;
-    setDetailLoading(true); setDetailError(null); setReto(null);
-    try { const result = await retosService.detail(id); if (request === detailVersion.current) setReto(result); }
-    catch (error) { if (request === detailVersion.current) setDetailError(error instanceof Error ? error.message : "No se pudo cargar el detalle."); }
-    finally { if (request === detailVersion.current) setDetailLoading(false); }
-  };
+  
+const loadDetail = useCallback(async (id: number) => {
+  const request = ++detailVersion.current;
+  setDetailLoading(true);
+  setDetailError(null);
+  setReto(null);
+
+  try {
+    const result = await retosService.detail(id);
+    if (request === detailVersion.current) setReto(result);} catch (error) {
+    if (request === detailVersion.current) {
+      setDetailError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo cargar el detalle.",);}} finally {
+    if (request === detailVersion.current) setDetailLoading(false);}}, []);
+
+  
+const openRetoFromQuery = useCallback(
+  (id: number) => {setSelected(id);setView("detail");void loadDetail(id);},
+  [loadDetail],);
+
   const [busy, setBusy] = useState(false);
   const [participationPending, setParticipationPending] = useState(false);
   const participationLock = useRef(false);
@@ -104,9 +138,10 @@ export function RetosView() {
       className="flex flex-col gap-6"
       aria-label="Retos de hábitos"
     >
-      <Suspense fallback={null}>
+    <Suspense fallback={null}>
         <ForbiddenNotice />
-      </Suspense>
+        <RetoQueryHandler onOpen={openRetoFromQuery} />
+    </Suspense>
       {issue && <Alert message={issue} />}
       {success && <Alert type="success" message={success} />}
       {categoriesError && <div><Alert type="info" message={categoriesError} /><Button disabled={loading || busy} onClick={() => void reload()}>Reintentar categorías</Button></div>}
